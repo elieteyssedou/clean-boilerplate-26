@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "BACK_FILES=$(git status --porcelain | grep -E '^[AM?][M?] back/.*\\.(ts|tsx|js|jsx)$' | cut -c4- | sed 's|^back/||'); EXISTING_FILES=\"\"; for file in $BACK_FILES; do if [ -f \"back/$file\" ]; then EXISTING_FILES=\"$EXISTING_FILES $file\"; fi; done; if [ -n \"$EXISTING_FILES\" ]; then cd back && yarn lint-fix-files $EXISTING_FILES; fi"
+          },
+          {
+            "type": "command",
+            "command": "BACK_TS_FILES=$(git status --porcelain | grep -E '^[AM?][M?] back/.*\\.(ts|tsx)$' | cut -c4- | sed 's|^back/||'); EXISTING_TS_FILES=\"\"; for file in $BACK_TS_FILES; do if [ -f \"back/$file\" ]; then EXISTING_TS_FILES=\"$EXISTING_TS_FILES $file\"; fi; done; if [ -n \"$EXISTING_TS_FILES\" ]; then cd back && yarn typecheck $EXISTING_TS_FILES; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

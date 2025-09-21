@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "strict": true,
+    "outDir": "dist",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@test/*": [
+        "./test/*"
+      ]
+    },
+    "noImplicitAny": true,
+    // 2 next lines from https://github.com/microsoft/tsyringe
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "./*.ts",
+    "./*.js",
+  ],
+  "exclude": [
+    "node_modules",
+    "./migrations/**/*"
+  ]
+}

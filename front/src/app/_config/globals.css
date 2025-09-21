@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import '../_styles/scrollbars.css';
+
+.sp-layout-reset {
+  border: none !important;
+  background-color: inherit !important;
+  border-radius: 0 !important;
+  gap: 0 !important;
+}
+
+.sp-layout-reset .sp-preview {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.sp-layout-reset .sp-preview-container {
+  background-color: transparent !important;
+}
+
+.sp-layout-reset iframe {
+  width: auto !important;
+  height: auto !important;
+  min-width: auto !important;
+  min-height: auto !important;
+}

@@ -1,0 +1,50 @@
+type ExampleResource {
+  id: ID!
+  teamId: String!
+  name: String!
+  description: String!
+  content: String!
+  tags: [String!]!
+  createdAt: String!
+  updatedAt: String!
+}
+
+input CreateExampleResourceInput {
+  name: String!
+  description: String!
+  content: String
+  tags: [String!]
+}
+
+input UpdateExampleResourceInput {
+  name: String
+  description: String
+  content: String
+  tags: [String!]
+}
+
+input GenerateResourceContentInput {
+  resourceName: String!
+  resourceDescription: String!
+  contentType: String
+  maxTokens: Int
+}
+
+type GenerateResourceContentResult {
+  content: String!
+  model: String!
+  tokensUsed: Int!
+  contentType: String!
+}
+
+extend type Query {
+  exampleResource(id: ID!): ExampleResource!
+  teamExampleResources(query: String): [ExampleResource!]!
+}
+
+extend type Mutation {
+  createExampleResource(input: CreateExampleResourceInput!): ExampleResource!
+  updateExampleResource(id: ID!, input: UpdateExampleResourceInput!): ExampleResource!
+  deleteExampleResource(id: ID!): Boolean!
+  generateResourceContent(input: GenerateResourceContentInput!): GenerateResourceContentResult!
+}

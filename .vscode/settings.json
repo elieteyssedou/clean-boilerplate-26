@@ -1,0 +1,28 @@
+{
+  "eslint.workingDirectories": [
+    "back",
+    "front",
+    "vscode-ext"
+  ],
+  "eslint.format.enable": true,
+  "editor.formatOnSave": true,
+  "javascript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "createTests.defaultLocationForTestFiles": "same location as source file",
+  "createTests.customLocationForTestFiles": "back/test/",
+  "createTests.sourceDir": "back/src",
+  "createTests.testDirectoryName": "",
+  "createTests.template.default": [
+    "describe('${moduleName}', () => {",
+    "  it('', () => {",
+    "",
+    "  });",
+    "});",
+    "",
+  ],
+  "gitlens.advanced.externalDiffTool": "vscode",
+  "diffEditor.renderSideBySide": false,
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "markdown.updateLinksOnFileMove.enabled": "always"
+}

@@ -1,0 +1,5 @@
+web: sh -c 'cd ./back/ && PORT=5100 yarn run nodemon --delay 3 -e graphql --exec yarn start-web'
+worker: sh -c 'cd ./back/ && yarn run nodemon --delay 3 --exec yarn start-worker'
+graphiql: sh -c 'cd ./back/ && yarn ruru -SPe http://localhost:5100/graphql'
+front: sh -c 'cd ./front/ && PORT=5200 yarn dev'
+front-graphql-codegen: sh -c 'cd ./front/ && yarn run graphql-codegen-watch'

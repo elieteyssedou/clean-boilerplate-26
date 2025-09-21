@@ -1,0 +1,657 @@
+import expect from '@test/chai';
+import sinon from 'sinon';
+import { StackFactory } from '@test/factories/StackFactory';
+import ComponentFactory from '@test/factories/ComponentFactory';
+import Component, { ComponentId } from '@/domain/entities/Component';
+import { TeamId } from '@/domain/entities/Team';
+
+describe('Component', () => {
+  let clock: sinon.SinonFakeTimers;
+  let component: Component;
+  const componentId = 'component-123' as ComponentId;
+  const teamId = 'team-456' as TeamId;
+
+  beforeEach(() => {
+    clock = sinon.useFakeTimers();
+    component = ComponentFactory.createTestComponent({
+      id: componentId,
+      teamId,
+      name: 'TestComponent',
+      initialPrompt: 'Initial prompt',
+      initialCode: '<div>Initial code</div>',
+      stack: StackFactory.createDefault(),
+    });
+  });
+
+  afterEach(() => {
+    clock.restore();
+  });
+
+  describe('addVersion', () => {
+    it('should increment the current version number', () => {
+      // Arrange
+      const initialVersion = component.getCurrentVersion();
+      expect(initialVersion).to.equal(1);
+
+      // Act
+      component.addVersion('Second version prompt', '<div>Second version code</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Assert
+      expect(component.getCurrentVersion()).to.equal(2);
+    });
+
+    it('should add new version to versions array', () => {
+      // Arrange
+      const initialVersionsCount = component.getVersions().length;
+      expect(initialVersionsCount).to.equal(1);
+
+      const newPrompt = 'Second version prompt';
+      const newCode = '<div>Second version code</div>';
+
+      // Act
+      component.addVersion(newPrompt, newCode, ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Assert
+      const versions = component.getVersions();
+      expect(versions).to.have.length(2);
+
+      const newVersion = versions[1];
+      expect(newVersion.version).to.equal(2);
+      expect(newVersion.prompt).to.equal(newPrompt);
+      expect(newVersion.code).to.equal(newCode);
+      expect(newVersion.createdAt).to.be.instanceOf(Date);
+    });
+
+    it('should update the updatedAt timestamp', () => {
+      // Arrange
+      const initialUpdatedAt = component.getUpdatedAt();
+
+      // Advance time by 1 second
+      clock.tick(1000);
+
+      // Act
+      component.addVersion('New prompt', '<div>New code</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Assert
+      const updatedAt = component.getUpdatedAt();
+      expect(updatedAt.getTime()).to.be.greaterThan(initialUpdatedAt.getTime());
+    });
+
+    it('should set createdAt timestamp for new version', () => {
+      // Arrange
+      const baseTime = new Date();
+      clock.tick(1000);
+
+      // Act
+      component.addVersion('New prompt', '<div>New code</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Assert
+      const versions = component.getVersions();
+      const newVersion = versions[1];
+      expect(newVersion.createdAt).to.be.instanceOf(Date);
+      expect(newVersion.createdAt.getTime()).to.be.greaterThan(baseTime.getTime());
+    });
+
+    it('should call _meta.unvalidate() to mark entity as unvalidated', () => {
+      // Arrange
+      // First validate the component
+      component.validate();
+      expect(component._meta.isValidated).to.be.true;
+
+      // Act
+      component.addVersion('New prompt', '<div>New code</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Assert
+      expect(component._meta.isValidated).to.be.false;
+    });
+
+    it('should handle multiple version additions correctly', () => {
+      // Arrange
+      const versionsToAdd = [
+        { prompt: 'Second version', code: '<div>Second</div>' },
+        { prompt: 'Third version', code: '<div>Third</div>' },
+        { prompt: 'Fourth version', code: '<div>Fourth</div>' },
+      ];
+
+      // Act
+      versionsToAdd.forEach((versionData) => {
+        clock.tick(1000); // Advance time between versions
+        component.addVersion(versionData.prompt, versionData.code);
+      });
+
+      // Assert
+      expect(component.getCurrentVersion()).to.equal(4);
+
+      const versions = component.getVersions();
+      expect(versions).to.have.length(4);
+
+      // Check each added version
+      versionsToAdd.forEach((versionData, index) => {
+        const versionIndex = index + 1; // Skip initial version at index 0
+        const version = versions[versionIndex];
+        expect(version.version).to.equal(versionIndex + 1);
+        expect(version.prompt).to.equal(versionData.prompt);
+        expect(version.code).to.equal(versionData.code);
+        expect(version.createdAt).to.be.instanceOf(Date);
+      });
+    });
+
+    it('should maintain version order and consistency', () => {
+      // Arrange
+      const version2Data = { prompt: 'Version 2', code: '<div>V2</div>' };
+      const version3Data = { prompt: 'Version 3', code: '<div>V3</div>' };
+
+      // Act
+      component.addVersion(version2Data.prompt, version2Data.code);
+      component.addVersion(version3Data.prompt, version3Data.code);
+
+      // Assert
+      const versions = component.getVersions();
+      expect(versions).to.have.length(3);
+
+      // Check version numbers are sequential
+      expect(versions[0].version).to.equal(1);
+      expect(versions[1].version).to.equal(2);
+      expect(versions[2].version).to.equal(3);
+
+      // Check current version points to latest
+      expect(component.getCurrentVersion()).to.equal(3);
+
+      // Check getCurrentCode returns latest version code
+      expect(component.getCurrentCode()).to.equal(version3Data.code);
+    });
+
+    it('should handle empty string parameters', () => {
+      // Act
+      component.addVersion('', '', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Assert
+      expect(component.getCurrentVersion()).to.equal(2);
+
+      const versions = component.getVersions();
+      expect(versions).to.have.length(2);
+
+      const newVersion = versions[1];
+      expect(newVersion.version).to.equal(2);
+      expect(newVersion.prompt).to.equal('');
+      expect(newVersion.code).to.equal('');
+      expect(newVersion.createdAt).to.be.instanceOf(Date);
+    });
+
+    it('should handle whitespace-only parameters', () => {
+      // Act
+      component.addVersion('   ', '\n\t  \n', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Assert
+      expect(component.getCurrentVersion()).to.equal(2);
+
+      const versions = component.getVersions();
+      const newVersion = versions[1];
+      expect(newVersion.prompt).to.equal('   ');
+      expect(newVersion.code).to.equal('\n\t  \n');
+    });
+
+    it('should handle long string parameters', () => {
+      // Arrange
+      const longPrompt = 'A'.repeat(1000);
+      const longCode = 'B'.repeat(5000);
+
+      // Act
+      component.addVersion(longPrompt, longCode);
+
+      // Assert
+      const versions = component.getVersions();
+      const newVersion = versions[1];
+      expect(newVersion.prompt).to.equal(longPrompt);
+      expect(newVersion.code).to.equal(longCode);
+    });
+
+    it('should maintain immutability of versions array', () => {
+      // Arrange
+      const originalVersions = component.getVersions();
+      const originalLength = originalVersions.length;
+
+      // Act
+      component.addVersion('New prompt', '<div>New code</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Assert
+      // Original array should be unchanged
+      expect(originalVersions).to.have.length(originalLength);
+
+      // New versions array should have additional version
+      const newVersions = component.getVersions();
+      expect(newVersions).to.have.length(originalLength + 1);
+
+      // But they should be different array instances
+      expect(newVersions).to.not.equal(originalVersions);
+    });
+
+    it('should update timestamps with each version addition', () => {
+      // Arrange
+      const timestamps: Date[] = [];
+      timestamps.push(component.getUpdatedAt());
+
+      // Act & Assert
+      for (let i = 1; i <= 3; i += 1) {
+        clock.tick(1000);
+        component.addVersion(`Version ${i + 1}`, `<div>Code ${i + 1}</div>`);
+
+        const currentUpdatedAt = component.getUpdatedAt();
+        timestamps.push(currentUpdatedAt);
+
+        // Each timestamp should be later than the previous
+        expect(currentUpdatedAt.getTime()).to.be.greaterThan(timestamps[i - 1].getTime());
+      }
+    });
+  });
+
+  describe('currentVersion getter', () => {
+    it('should return the current version data', () => {
+      // Arrange
+      // Act
+      const currentVersionData = component.currentVersion;
+
+      // Assert
+      expect(currentVersionData.version).to.equal(1);
+      expect(currentVersionData.code).to.equal('<div>Initial code</div>');
+      expect(currentVersionData.prompt).to.equal('Initial prompt');
+      expect(currentVersionData.createdAt).to.be.a('string');
+      expect(new Date(currentVersionData.createdAt)).to.be.a('date');
+    });
+
+    it('should return the correct current version data after adding versions', () => {
+      // Arrange
+      const secondPrompt = 'Second version prompt';
+      const secondCode = '<div>Second version code</div>';
+
+      // Act
+      component.addVersion(secondPrompt, secondCode);
+      const currentVersionData = component.currentVersion;
+
+      // Assert
+      expect(currentVersionData.version).to.equal(2);
+      expect(currentVersionData.code).to.equal(secondCode);
+      expect(currentVersionData.prompt).to.equal(secondPrompt);
+      expect(currentVersionData.createdAt).to.be.a('string');
+      expect(new Date(currentVersionData.createdAt)).to.be.a('date');
+    });
+
+    it('should return the correct current version data after multiple additions', () => {
+      // Arrange
+      component.addVersion('Version 2', '<div>Version 2</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+      component.addVersion('Version 3', '<div>Version 3</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+      const finalPrompt = 'Final version';
+      const finalCode = '<div>Final version</div>';
+
+      // Act
+      component.addVersion(finalPrompt, finalCode);
+      const currentVersionData = component.currentVersion;
+
+      // Assert
+      expect(currentVersionData.version).to.equal(4);
+      expect(currentVersionData.code).to.equal(finalCode);
+      expect(currentVersionData.prompt).to.equal(finalPrompt);
+      expect(component.getCurrentVersion()).to.equal(4);
+    });
+
+    it('should always return the same data as the last element in versions array', () => {
+      // Arrange
+      component.addVersion('New version', '<div>New version</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Act
+      const currentVersionData = component.currentVersion;
+      const versions = component.getVersions();
+      const lastVersion = versions[versions.length - 1];
+
+      // Assert
+      expect(currentVersionData.version).to.equal(lastVersion.version);
+      expect(currentVersionData.code).to.equal(lastVersion.code);
+      expect(currentVersionData.prompt).to.equal(lastVersion.prompt);
+      expect(currentVersionData.createdAt).to.equal(lastVersion.createdAt.toISOString());
+    });
+
+    it('should return data consistent with getCurrentVersion() number', () => {
+      // Arrange
+      component.addVersion('Version 2', '<div>Version 2</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+      component.addVersion('Version 3', '<div>Version 3</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Act
+      const currentVersionData = component.currentVersion;
+      const currentVersionNumber = component.getCurrentVersion();
+
+      // Assert
+      expect(currentVersionData.version).to.equal(currentVersionNumber);
+      expect(currentVersionData.version).to.equal(3);
+    });
+  });
+
+  describe('multiple iterations', () => {
+    it('should handle multiple version additions correctly', () => {
+      // Arrange
+      const iterations = [
+        { prompt: 'Add red background', code: '<div style="background: red">Content</div>' },
+        { prompt: 'Change to blue background', code: '<div style="background: blue">Content</div>' },
+        { prompt: 'Add border', code: '<div style="background: blue; border: 1px solid black">Content</div>' },
+        { prompt: 'Make text bold', code: '<div style="background: blue; border: 1px solid black; font-weight: bold">Content</div>' },
+      ];
+
+      // Act
+      iterations.forEach(({ prompt, code }, index) => {
+        clock.tick(100); // Ensure different timestamps
+        component.addVersion(prompt, code);
+
+        // Assert version increment
+        expect(component.getCurrentVersion()).to.equal(index + 2);
+        expect(component.getCurrentCode()).to.equal(code);
+      });
+
+      // Assert final state
+      const versions = component.getVersions();
+      expect(versions).to.have.length(5); // Initial + 4 iterations
+
+      // Verify all versions are preserved in order
+      expect(versions[0].version).to.equal(1);
+      expect(versions[0].prompt).to.equal('Initial prompt');
+
+      iterations.forEach(({ prompt, code }, index) => {
+        const versionIndex = index + 1;
+        expect(versions[versionIndex].version).to.equal(versionIndex + 1);
+        expect(versions[versionIndex].prompt).to.equal(prompt);
+        expect(versions[versionIndex].code).to.equal(code);
+      });
+    });
+
+    it('should maintain version history order across multiple iterations', () => {
+      // Arrange
+      const versionData = [
+        { prompt: 'First iteration', code: '<div>First</div>' },
+        { prompt: 'Second iteration', code: '<div>Second</div>' },
+        { prompt: 'Third iteration', code: '<div>Third</div>' },
+        { prompt: 'Fourth iteration', code: '<div>Fourth</div>' },
+        { prompt: 'Fifth iteration', code: '<div>Fifth</div>' },
+      ];
+
+      // Act
+      versionData.forEach(({ prompt, code }) => {
+        component.addVersion(prompt, code);
+      });
+
+      // Assert
+      const versions = component.getVersions();
+      expect(versions).to.have.length(6); // Initial + 5 iterations
+
+      // Verify version numbers are sequential
+      versions.forEach((version, index) => {
+        expect(version.version).to.equal(index + 1);
+      });
+
+      // Verify prompts are in correct order
+      expect(versions[0].prompt).to.equal('Initial prompt'); // Initial
+      versionData.forEach(({ prompt }, index) => {
+        expect(versions[index + 1].prompt).to.equal(prompt);
+      });
+    });
+
+    it('should preserve all version timestamps during multiple iterations', () => {
+      // Arrange
+      const baseTime = clock.now;
+      const timeIntervals = [1000, 2000, 1500, 3000]; // Different time gaps
+
+      // Act & Assert
+      timeIntervals.forEach((interval, index) => {
+        clock.tick(interval);
+        component.addVersion(`Iteration ${index + 1}`, `<div>Code ${index + 1}</div>`);
+
+        const versions = component.getVersions();
+        const newVersion = versions[versions.length - 1];
+
+        // Verify timestamp is correct
+        const expectedTime = baseTime + timeIntervals.slice(0, index + 1)
+          .reduce((sum, time) => sum + time, 0);
+        expect(newVersion.createdAt.getTime()).to.equal(expectedTime);
+      });
+
+      // Verify all timestamps are different and in chronological order
+      const versions = component.getVersions();
+      for (let i = 1; i < versions.length; i += 1) {
+        expect(versions[i].createdAt.getTime())
+          .to.be.greaterThan(versions[i - 1].createdAt.getTime());
+      }
+    });
+
+    it('should update component updatedAt with each iteration', () => {
+      // Arrange
+      const originalUpdatedAt = component.getUpdatedAt();
+
+      // Act & Assert
+      for (let i = 1; i <= 5; i += 1) {
+        clock.tick(1000);
+        const beforeIteration = component.getUpdatedAt();
+
+        component.addVersion(`Iteration ${i}`, `<div>Iteration ${i}</div>`);
+
+        const afterIteration = component.getUpdatedAt();
+
+        // Verify updatedAt changed
+        expect(afterIteration.getTime()).to.be.greaterThan(beforeIteration.getTime());
+
+        // Verify it's later than original
+        expect(afterIteration.getTime()).to.be.greaterThan(originalUpdatedAt.getTime());
+      }
+    });
+
+    it('should invalidate meta properties with each iteration', () => {
+      // Arrange
+      component.validate(); // Start with valid component
+      expect(component._meta.isValidated).to.be.true;
+
+      // Act & Assert
+      for (let i = 1; i <= 3; i += 1) {
+        component.addVersion(`Iteration ${i}`, `<div>Code ${i}</div>`);
+
+        // Should be invalidated after each iteration
+        expect(component._meta.isValidated).to.be.false;
+        expect(component._meta.isReadyToSave()).to.be.false;
+
+        // Re-validate for next iteration
+        component.validate();
+        expect(component._meta.isValidated).to.be.true;
+      }
+    });
+
+    it('should handle rapid successive iterations', () => {
+      // Arrange
+      const rapidIterations = 20;
+
+      // Act
+      for (let i = 1; i <= rapidIterations; i += 1) {
+        component.addVersion(`Rapid iteration ${i}`, `<div>Rapid ${i}</div>`);
+      }
+
+      // Assert
+      const versions = component.getVersions();
+      expect(versions).to.have.length(rapidIterations + 1); // Initial + rapid iterations
+
+      // Verify all version numbers are correct
+      versions.forEach((version, index) => {
+        expect(version.version).to.equal(index + 1);
+      });
+
+      // Verify current version is the latest
+      expect(component.getCurrentVersion()).to.equal(rapidIterations + 1);
+      expect(component.getCurrentCode()).to.equal(`<div>Rapid ${rapidIterations}</div>`);
+    });
+
+    it('should maintain data integrity across complex iteration patterns', () => {
+      // Arrange
+      const complexIterations = [
+        { prompt: 'Initial styling', code: '<div className="container">Content</div>' },
+        { prompt: 'Add responsive design', code: '<div className="container mx-auto px-4 sm:px-6 lg:px-8">Content</div>' },
+        { prompt: 'Include accessibility features', code: '<div className="container mx-auto px-4 sm:px-6 lg:px-8" role="main" aria-label="Main content">Content</div>' },
+        { prompt: 'Optimize for performance', code: '<div className="container mx-auto px-4 sm:px-6 lg:px-8" role="main" aria-label="Main content">Content</div>' },
+        { prompt: 'Add dark mode support', code: '<div className="container mx-auto px-4 sm:px-6 lg:px-8 dark:bg-gray-900" role="main" aria-label="Main content">Content</div>' },
+      ];
+
+      // Act
+      complexIterations.forEach(({ prompt, code }, index) => {
+        clock.tick((index + 1) * 500); // Variable time intervals
+        component.addVersion(prompt, code);
+      });
+
+      // Assert complete data integrity
+      const versions = component.getVersions();
+      expect(versions).to.have.length(6); // Initial + 5 complex iterations
+
+      // Verify each iteration maintained correct data
+      complexIterations.forEach(({ prompt, code }, index) => {
+        const versionIndex = index + 1;
+        const version = versions[versionIndex];
+
+        expect(version.version).to.equal(versionIndex + 1);
+        expect(version.prompt).to.equal(prompt);
+        expect(version.code).to.equal(code);
+        expect(version.createdAt).to.be.instanceOf(Date);
+      });
+
+      // Verify current state reflects latest iteration
+      const latestIteration = complexIterations[complexIterations.length - 1];
+      expect(component.getCurrentCode()).to.equal(latestIteration.code);
+      expect(component.getCurrentVersion()).to.equal(6);
+    });
+  });
+
+  describe('stack functionality', () => {
+    it('should store and retrieve stack configuration', () => {
+      // Act
+      const { stack } = component;
+
+      // Assert
+      expect(stack).to.exist;
+      expect(stack.language).to.equal('typescript');
+      expect(stack.framework.name).to.equal('react');
+      expect(stack.framework.version).to.equal('18');
+      expect(stack.dependencies).to.have.length(1);
+      expect(stack.dependencies[0].key).to.equal('tailwindcss');
+      expect(stack.dependencies[0].version).to.equal('3.4.16');
+    });
+
+    it('should create component with JavaScript stack', () => {
+      // Arrange
+      const jsStack = StackFactory.createJavaScript();
+
+      // Act
+      const jsComponent = ComponentFactory.createTestComponent({
+        id: 'js-component' as ComponentId,
+        teamId,
+        name: 'JSComponent',
+        initialPrompt: 'JS component',
+        initialCode: '<div>JS code</div>',
+        stack: jsStack,
+      });
+
+      // Assert
+      expect(jsComponent.stack.language).to.equal('javascript');
+      expect(jsComponent.stack.framework.name).to.equal('react');
+      expect(jsComponent.stack.dependencies).to.have.length(1);
+      expect(jsComponent.stack.dependencies[0].key).to.equal('tailwindcss');
+    });
+
+    it('should create component without Tailwind in stack', () => {
+      // Arrange
+      const noTailwindStack = StackFactory.createWithoutTailwind();
+
+      // Act
+      const noTailwindComponent = ComponentFactory.createTestComponent({
+        id: 'no-tailwind-component' as ComponentId,
+        teamId,
+        name: 'NoTailwindComponent',
+        initialPrompt: 'Component without Tailwind',
+        initialCode: '<div>Plain code</div>',
+        stack: noTailwindStack,
+      });
+
+      // Assert
+      expect(noTailwindComponent.stack.language).to.equal('typescript');
+      expect(noTailwindComponent.stack.framework.name).to.equal('react');
+      expect(noTailwindComponent.stack.dependencies).to.have.length(0);
+      expect(noTailwindComponent.stack.hasTailwind()).to.be.false;
+    });
+
+    it('should create component with custom dependencies in stack', () => {
+      // Arrange
+      const customStack = StackFactory.createWithCustomDependencies([
+        {
+          key: 'tailwindcss',
+          name: 'Tailwind CSS',
+          version: '3.4.0',
+          type: 'cdn',
+          description: 'A utility-first CSS framework',
+          cdnUrl: 'https://cdn.tailwindcss.com/3.4.0',
+        },
+        {
+          key: 'styled-components',
+          name: 'styled-components',
+          version: 'latest',
+          type: 'package',
+          description: 'CSS-in-JS library',
+        },
+      ]);
+
+      // Act
+      const customComponent = ComponentFactory.createTestComponent({
+        id: 'custom-component' as ComponentId,
+        teamId,
+        name: 'CustomComponent',
+        initialPrompt: 'Component with custom libraries',
+        initialCode: '<div>Custom code</div>',
+        stack: customStack,
+      });
+
+      // Assert
+      expect(customComponent.stack.dependencies).to.have.length(2);
+      expect(customComponent.stack.dependencies[0].key).to.equal('tailwindcss');
+      expect(customComponent.stack.dependencies[0].version).to.equal('3.4.0');
+      expect(customComponent.stack.dependencies[1].key).to.equal('styled-components');
+      expect(customComponent.stack.hasTailwind()).to.be.true;
+      expect(customComponent.stack.getTailwindVersion()).to.equal('3.4.0');
+    });
+
+    it('should preserve stack configuration after adding versions', () => {
+      // Arrange
+      const originalStack = component.stack;
+
+      // Act
+      component.addVersion('New version', '<div>New code</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+      component.addVersion('Another version', '<div>Another code</div>', ComponentFactory.createDefaultGenerationMetadata(), ComponentFactory.createDefaultExampleParameters());
+
+      // Assert
+      const stackAfterVersions = component.stack;
+      expect(stackAfterVersions.language).to.equal(originalStack.language);
+      expect(stackAfterVersions.framework.name).to.equal(originalStack.framework.name);
+      expect(stackAfterVersions.framework.version).to.equal(originalStack.framework.version);
+      expect(stackAfterVersions.dependencies).to.have.length(originalStack.dependencies.length);
+    });
+
+    it('should include stack in validation', () => {
+      // Arrange
+      const componentWithoutValidation = ComponentFactory.createTestComponent({
+        id: 'validation-test' as ComponentId,
+        teamId,
+        name: 'ValidationTest',
+        initialPrompt: 'Test validation',
+        initialCode: '<div>Test</div>',
+        stack: StackFactory.createDefault(),
+      });
+
+      // Initially not validated
+      expect(componentWithoutValidation._meta.isValidated).to.be.false;
+
+      // Act
+      componentWithoutValidation.validate();
+
+      // Assert
+      expect(componentWithoutValidation._meta.isValidated).to.be.true;
+      expect(componentWithoutValidation._meta.isReadyToSave()).to.be.true;
+    });
+  });
+});

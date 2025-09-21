@@ -1,0 +1,96 @@
+{
+  "extends": [
+    "airbnb-base",
+    "airbnb-typescript/base",
+    "plugin:@typescript-eslint/recommended-type-checked", // @typescript-eslint @v6
+    "plugin:@typescript-eslint/stylistic-type-checked" // @typescript-eslint @v6.
+  ],
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  },
+  "plugins": [
+    "unused-imports",
+    "chai-friendly"
+  ],
+  "rules": {
+    "no-console": 1,
+    "@typescript-eslint/no-unused-expressions": "off",
+    "no-unused-expressions": 0, // https://www.npmjs.com/package/eslint-plugin-chai-friendly
+    "chai-friendly/no-unused-expressions": 2,
+    "no-unused-vars": "off", // or "@typescript-eslint/no-unused-vars": "off",
+    "unused-imports/no-unused-imports": "error",
+    "unused-imports/no-unused-vars": [
+      "warn",
+      {
+        "vars": "all",
+        "varsIgnorePattern": "^_",
+        "args": "after-used",
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "import/extensions": [
+      "error",
+      "ignorePackages",
+      {
+        "": "never",
+        "js": "never",
+        "jsx": "never",
+        "ts": "never",
+        "tsx": "never"
+      }
+    ],
+    "no-use-before-define": [
+      "error",
+      {
+        "functions": false,
+        "classes": true,
+        "variables": true
+      }
+    ],
+    "@typescript-eslint/no-use-before-define": [
+      "error",
+      {
+        "functions": false,
+        "classes": true,
+        "variables": true,
+        "enums": true,
+        "typedefs": true
+      }
+    ],
+    "no-restricted-syntax": [
+      "error",
+      "ForInStatement",
+      "LabeledStatement",
+      "WithStatement"
+    ],
+    "no-await-in-loop": "off",
+    "class-methods-use-this": "off",
+    "no-underscore-dangle": [
+      "error",
+      {
+        "allow": [
+          "_meta"
+        ]
+      }
+    ]
+  },
+  "ignorePatterns": ["migrations/**/*.js"],
+  "overrides": [
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.js",
+        "test/**/*.ts",
+        "test/**/*.js"
+      ],
+      "rules": {
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "max-len": "off"
+      }
+    }
+  ]
+}

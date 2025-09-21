@@ -1,0 +1,13 @@
+scalar File
+
+type UploadedFile {
+  id: ID!
+  originalName: String!
+  mimeType: String!
+  size: Int!
+  uploadedAt: String!
+}
+
+extend type Mutation {
+  uploadFile(file: File!): UploadedFile!
+}
